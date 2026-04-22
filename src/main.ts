@@ -20,9 +20,13 @@ async function bootstrap() {
     frontendUrl,
     vitrineUrl,
     vercelUrl,
+    'https://guya-admin.vercel.app',
+    'https://guya-fibre.vercel.app',
     'https://guyafibre-frontend.vercel.app',
     'https://guyafibre.com',
     'https://www.guyafibre.com',
+    'http://localhost:3000',
+    'http://localhost:3001',
   ].filter(Boolean);
 
   app.enableCors({
