@@ -1,0 +1,294 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================
+// ENUMS
+// ============================================
+
+enum Role {
+  SUPER_ADMIN
+  EDITOR
+  VIEWER
+}
+
+enum DevisStatus {
+  NEW
+  PENDING
+  IN_PROGRESS
+  QUOTE_SENT
+  ACCEPTED
+  REJECTED
+  CANCELLED
+}
+
+enum Urgency {
+  LOW
+  NORMAL
+  HIGH
+  URGENT
+}
+
+// ============================================
+// MODELS
+// ============================================
+
+model User {
+  id           String    @id @default(cuid())
+  email        String    @unique
+  password     String
+  firstName    String
+  lastName     String
+  role         Role      @default(EDITOR)
+  isActive     Boolean   @default(true)
+  lastLogin    DateTime?
+  refreshToken String?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  // Relations
+  devisAssigned    Devis[]         @relation("AssignedTo")
+  devisNotes       DevisNote[]     @relation("NoteAuthor")
+  devisResponses   DevisResponse[] @relation("ResponseAuthor")
+  medias           Media[]         @relation("UploadedBy")
+  siteContentUpdated SiteContent[] @relation("UpdatedBy")
+  emailTemplatesUpdated EmailTemplate[] @relation("TemplateUpdatedBy")
+  activityLogs     ActivityLog[]   @relation("LogUser")
+  rapports         Rapport[]       @relation("RapportAuthor")
+}
+model Devis {
+  id          String      @id @default(cuid())
+  reference   String      @unique
+
+  clientName  String
+  clientEmail String
+  clientPhone String
+  company     String?
+
+  services    String[]
+  location    String
+  address     String?
+  postalCode  String?
+  description String      @db.Text
+  urgency     Urgency     @default(NORMAL)
+
+  status      DevisStatus @default(NEW)
+  amount      Float?      
+  notes       DevisNote[]     @relation("DevisNotes")
+  responses   DevisResponse[] @relation("DevisResponses")
+  assignedTo  User?           @relation("AssignedTo", fields: [assignedToId], references: [id])
+  assignedToId String?
+  rapports    Rapport[]       @relation("RapportDevis")
+
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+}
+
+model DevisNote {
+  id        String   @id @default(cuid())
+  content   String   @db.Text
+  devis     Devis    @relation("DevisNotes", fields: [devisId], references: [id], onDelete: Cascade)
+  devisId   String
+  author    User     @relation("NoteAuthor", fields: [authorId], references: [id])
+  authorId  String
+  createdAt DateTime @default(now())
+}
+
+model DevisResponse {
+  id        String   @id @default(cuid())
+  subject   String
+  body      String   @db.Text
+  sentAt    DateTime @default(now())
+  devis     Devis    @relation("DevisResponses", fields: [devisId], references: [id], onDelete: Cascade)
+  devisId   String
+  sentBy    User     @relation("ResponseAuthor", fields: [sentById], references: [id])
+  sentById  String
+}
+
+model ServiceContent {
+  id          String   @id @default(cuid())
+  slug        String   @unique
+  number      String
+  icon        String
+  titleFr     String
+  titleEn     String?
+  titleEs     String?
+  titlePt     String?
+  titleNl     String?
+  titleGcr    String?
+  descFr      String   @db.Text
+  descEn      String?  @db.Text
+  features    String[]
+  image       String?
+  benefit     String?
+  isActive    Boolean  @default(true)
+  order       Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Realisation {
+  id          String   @id @default(cuid())
+  slug        String   @unique
+  titleFr     String
+  titleEn     String?
+  location    String
+  date        String
+  scope       String
+  descFr      String   @db.Text
+  descEn      String?  @db.Text
+  tags        String[]
+  images      String[]
+  client      String?
+  isActive    Boolean  @default(true)
+  isFeatured  Boolean  @default(false)
+  order       Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Media {
+  id           String    @id @default(cuid())
+  filename     String    @unique
+  originalName String
+  mimeType     String
+  size         Int
+  url          String
+  thumbnailUrl String?
+  folder       String    @default("general")
+  uploadedBy   User      @relation("UploadedBy", fields: [uploadedById], references: [id])
+  uploadedById String
+  createdAt    DateTime  @default(now())
+}
+
+model SiteContent {
+  id        String   @id @default(cuid())
+  section   String   @unique
+  content   Json
+  updatedAt DateTime @updatedAt
+  updatedBy User?    @relation("UpdatedBy", fields: [updatedById], references: [id])
+  updatedById String?
+}
+
+model EmailTemplate {
+  id        String   @id @default(cuid())
+  slug      String   @unique
+  name      String
+  subject   String
+  bodyHtml  String   @db.Text
+  bodyText  String?  @db.Text
+  variables String[]
+  updatedAt DateTime @updatedAt
+  updatedBy User?    @relation("TemplateUpdatedBy", fields: [updatedById], references: [id])
+  updatedById String?
+}
+
+model Setting {
+  id        String   @id @default(cuid())
+  group     String
+  key       String
+  value     String   @db.Text
+  type      String   @default("string")
+
+  @@unique([group, key])
+}
+
+model ActivityLog {
+  id         String   @id @default(cuid())
+  action     String
+  entity     String
+  entityId   String?
+  description String
+  metadata   Json?
+  ipAddress  String?
+  userAgent  String?
+  user       User?    @relation("LogUser", fields: [userId], references: [id])
+  userId     String?
+  createdAt  DateTime @default(now())
+}
+
+model Contact {
+  id        String   @id @default(cuid())
+  reference String   @unique
+  name      String
+  email     String
+  phone     String?
+  subject   String
+  address   String?
+  postalCode String?
+  city      String?
+  message   String   @db.Text
+  isRead    Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// ============================================
+// RAPPORTS D'INTERVENTION
+// ============================================
+
+enum RapportStatus {
+  DRAFT
+  SIGNED
+  ARCHIVED
+}
+
+enum SupportType {
+  IMB
+  MAISON
+  BATIMENT
+  LOCAL_PRO
+  AUTRE
+}
+
+model Rapport {
+  id        String        @id @default(cuid())
+  reference String        @unique
+
+  title       String
+  typeSupport SupportType?
+  status      RapportStatus @default(DRAFT)
+
+  // Auteur
+  author    User   @relation("RapportAuthor", fields: [authorId], references: [id])
+  authorId  String
+
+  // Lien optionnel avec un devis
+  devis   Devis?  @relation("RapportDevis", fields: [devisId], references: [id])
+  devisId String?
+
+  // Localisation du site
+  batiment      String?
+  batimentChoix String?
+  hall          String?
+  appartement   String?
+
+  // Local technique
+  localTechnique             String?
+  localTechniqueLocalisation String?
+  photoLocalTechniqueUrl     String?
+
+  // Pavillon / appartement
+  photoPavillonUrl String?
+  gpsLat           Float?
+  gpsLng           Float?
+
+  // Notes
+  notes String? @db.Text
+
+  // Signatures (base64 PNG)
+  signatureTechnicien String? @db.Text
+  signatureClient     String? @db.Text
+  signedAt            DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
