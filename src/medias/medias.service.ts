@@ -128,7 +128,9 @@ export class MediasService {
   }
 
   async findAll(query: { page?: number; limit?: number; folder?: string; search?: string; mimeType?: string }) {
-    const { page = 1, limit = 50, folder, search, mimeType } = query;
+    const page = Math.max(1, Number(query.page) || 1);
+    const limit = Math.min(100, Math.max(1, Number(query.limit) || 50));
+    const { folder, search, mimeType } = query;
     const skip = (page - 1) * limit;
 
     const where: any = {};
