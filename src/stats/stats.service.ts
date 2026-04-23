@@ -42,20 +42,20 @@ export class StatsService {
     });
     const activeClients = activeClientsResult.length;
 
-    // Top categories from realisations
+    // Top tags from realisations
     const realisations = await this.prisma.realisation.findMany({
-      where: { isPublished: true },
-      select: { category: true },
+      where: { isActive: true },
+      select: { tags: true },
     });
 
-    const categoryCounts: Record<string, number> = {};
+    const tagCounts: Record<string, number> = {};
     for (const r of realisations) {
-      if (r.category) {
-        categoryCounts[r.category] = (categoryCounts[r.category] || 0) + 1;
+      for (const tag of r.tags || []) {
+        tagCounts[tag] = (tagCounts[tag] || 0) + 1;
       }
     }
-    const totalCount = Object.values(categoryCounts).reduce((a, b) => a + b, 0);
-    const topServices = Object.entries(categoryCounts)
+    const totalCount = Object.values(tagCounts).reduce((a, b) => a + b, 0);
+    const topServices = Object.entries(tagCounts)
       .map(([name, count]) => ({
         name,
         serviceName: name,
