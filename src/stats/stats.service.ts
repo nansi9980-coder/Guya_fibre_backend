@@ -19,24 +19,22 @@ export class StatsService {
     ] = await Promise.all([
       this.prisma.contact.count({ where: { createdAt: { gte: startOfMonth } } }),
       this.prisma.contact.count({ where: { createdAt: { gte: startOfLastMonth, lte: endOfLastMonth } } }),
-      this.prisma.contact.count({ where: { status: 'UNREAD' } }),
+      this.prisma.contact.count({ where: { isRead: false } }),
       this.prisma.contact.findMany({
         take: 5,
         orderBy: { createdAt: 'desc' },
         select: {
           id: true, reference: true, name: true, email: true,
           phone: true, subject: true, message: true,
-          status: true, createdAt: true, updatedAt: true,
+          isRead: true, createdAt: true, updatedAt: true,
         },
       }),
     ]);
 
-    // Monthly change %
     const monthlyChange = contactsLastMonth > 0
       ? Math.round(((totalContactsThisMonth - contactsLastMonth) / contactsLastMonth) * 100)
       : 0;
 
-    // Active clients (unique emails this month)
     const activeClientsResult = await this.prisma.contact.findMany({
       where: { createdAt: { gte: startOfMonth } },
       select: { email: true },
@@ -44,7 +42,7 @@ export class StatsService {
     });
     const activeClients = activeClientsResult.length;
 
-    // Top services from site-content (realisations categories)
+    // Top categories from realisations
     const realisations = await this.prisma.realisation.findMany({
       where: { isPublished: true },
       select: { category: true },
@@ -67,8 +65,8 @@ export class StatsService {
       .sort((a, b) => b.count - a.count)
       .slice(0, 5);
 
-    // Map contact fields to match existing frontend DashboardData type
-    const recentDevis = recentContacts.map((c: any) => ({
+    // Map to frontend DashboardData shape
+    const recentDevis = recentContacts.map((c) => ({
       id: c.id,
       reference: c.reference,
       clientName: c.name,
@@ -78,7 +76,7 @@ export class StatsService {
       location: '',
       description: c.message,
       urgency: 'NORMAL',
-      status: c.status,
+      status: c.isRead ? 'READ' : 'UNREAD',
       amount: null,
       createdAt: c.createdAt,
       updatedAt: c.updatedAt,
@@ -118,7 +116,7 @@ export class StatsService {
 
     const contacts = await this.prisma.contact.findMany({
       where: { createdAt: { gte: startDate } },
-      select: { createdAt: true, status: true },
+      select: { createdAt: true, isRead: true },
     });
 
     const dailyStats: Record<string, { total: number; accepted: number; rejected: number }> = {};
@@ -126,8 +124,7 @@ export class StatsService {
       const date = c.createdAt.toISOString().split('T')[0];
       if (!dailyStats[date]) dailyStats[date] = { total: 0, accepted: 0, rejected: 0 };
       dailyStats[date].total++;
-      if (c.status === 'READ') dailyStats[date].accepted++;
-      if (c.status === 'ARCHIVED') dailyStats[date].rejected++;
+      if (c.isRead) dailyStats[date].accepted++;
     }
 
     return Object.entries(dailyStats)
