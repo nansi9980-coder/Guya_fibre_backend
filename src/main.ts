@@ -22,6 +22,7 @@ async function bootstrap() {
     vercelUrl,
     'https://guya-admin.vercel.app',
     'https://guya-fibre.vercel.app',
+    'https://guya-fibre-three.vercel.app',
     'https://guyafibre-frontend.vercel.app',
     'https://guyafibre.com',
     'https://www.guyafibre.com',
