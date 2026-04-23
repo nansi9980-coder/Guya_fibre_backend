@@ -32,7 +32,9 @@ export class ActivityLogService {
   }
 
   async findAll(query: { page?: number; limit?: number; entity?: string; action?: string; userId?: string }) {
-    const { page = 1, limit = 20, entity, action, userId } = query;
+    const page = Math.max(1, Number(query.page) || 1);
+    const limit = Math.min(500, Math.max(1, Number(query.limit) || 20));
+    const { entity, action, userId } = query;
     const skip = (page - 1) * limit;
 
     const where: any = {};
