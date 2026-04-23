@@ -17,9 +17,15 @@ export class StatsController {
     return this.statsService.getDashboard();
   }
 
+  @Get('charts')
+  @ApiOperation({ summary: 'Stats par période (charts)' })
+  async getCharts(@Query('period') period: string) {
+    return this.statsService.getContactStats(period || 'month');
+  }
+
   @Get('devis')
   @ApiOperation({ summary: 'Stats des devis par période' })
   async getDevisStats(@Query('period') period: string) {
-    return this.statsService.getDevisStats(period || 'month');
+    return this.statsService.getContactStats(period || 'month');
   }
 }

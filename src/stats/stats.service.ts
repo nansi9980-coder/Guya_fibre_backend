@@ -12,76 +12,84 @@ export class StatsService {
     const endOfLastMonth = new Date(now.getFullYear(), now.getMonth(), 0);
 
     const [
-      totalDevisThisMonth,
-      devisLastMonth,
-      pendingDevis,
-      recentDevis,
-      allDevis,
-      acceptedDevisWithAmount,
-      totalDevis,
-      acceptedDevis,
+      totalContactsThisMonth,
+      contactsLastMonth,
+      pendingContacts,
+      recentContacts,
     ] = await Promise.all([
-      this.prisma.devis.count({ where: { createdAt: { gte: startOfMonth } } }),
-      this.prisma.devis.count({ where: { createdAt: { gte: startOfLastMonth, lte: endOfLastMonth } } }),
-      this.prisma.devis.count({ where: { status: { in: ['NEW', 'PENDING', 'IN_PROGRESS'] } } }),
-      this.prisma.devis.findMany({
+      this.prisma.contact.count({ where: { createdAt: { gte: startOfMonth } } }),
+      this.prisma.contact.count({ where: { createdAt: { gte: startOfLastMonth, lte: endOfLastMonth } } }),
+      this.prisma.contact.count({ where: { status: 'UNREAD' } }),
+      this.prisma.contact.findMany({
         take: 5,
         orderBy: { createdAt: 'desc' },
         select: {
-          id: true, reference: true, clientName: true, clientEmail: true,
-          clientPhone: true, services: true, location: true, description: true,
-          urgency: true, status: true, amount: true, createdAt: true, updatedAt: true,
+          id: true, reference: true, name: true, email: true,
+          phone: true, subject: true, message: true,
+          status: true, createdAt: true, updatedAt: true,
         },
       }),
-      this.prisma.devis.findMany({ select: { services: true } }),
-      this.prisma.devis.findMany({
-        where: { status: 'ACCEPTED', amount: { not: null } },
-        select: { amount: true },
-      }),
-      this.prisma.devis.count(),
-      this.prisma.devis.count({ where: { status: 'ACCEPTED' } }),
     ]);
 
-    // Monthly revenue
-    const monthlyRevenue = acceptedDevisWithAmount.reduce((sum, d) => sum + (d.amount ?? 0), 0);
-
     // Monthly change %
-    const monthlyChange = devisLastMonth > 0
-      ? Math.round(((totalDevisThisMonth - devisLastMonth) / devisLastMonth) * 100)
+    const monthlyChange = contactsLastMonth > 0
+      ? Math.round(((totalContactsThisMonth - contactsLastMonth) / contactsLastMonth) * 100)
       : 0;
 
     // Active clients (unique emails this month)
-    const activeClientsResult = await this.prisma.devis.findMany({
+    const activeClientsResult = await this.prisma.contact.findMany({
       where: { createdAt: { gte: startOfMonth } },
-      select: { clientEmail: true },
-      distinct: ['clientEmail'],
+      select: { email: true },
+      distinct: ['email'],
     });
     const activeClients = activeClientsResult.length;
 
-    // Top services
-    const serviceCounts: Record<string, number> = {};
-    for (const devis of allDevis) {
-      for (const service of devis.services) {
-        serviceCounts[service] = (serviceCounts[service] || 0) + 1;
+    // Top services from site-content (realisations categories)
+    const realisations = await this.prisma.realisation.findMany({
+      where: { isPublished: true },
+      select: { category: true },
+    });
+
+    const categoryCounts: Record<string, number> = {};
+    for (const r of realisations) {
+      if (r.category) {
+        categoryCounts[r.category] = (categoryCounts[r.category] || 0) + 1;
       }
     }
-    const totalServiceCount = Object.values(serviceCounts).reduce((a, b) => a + b, 0);
-    const topServices = Object.entries(serviceCounts)
+    const totalCount = Object.values(categoryCounts).reduce((a, b) => a + b, 0);
+    const topServices = Object.entries(categoryCounts)
       .map(([name, count]) => ({
         name,
         serviceName: name,
         count,
-        percentage: totalServiceCount > 0 ? Math.round((count / totalServiceCount) * 100) : 0,
+        percentage: totalCount > 0 ? Math.round((count / totalCount) * 100) : 0,
       }))
       .sort((a, b) => b.count - a.count)
       .slice(0, 5);
 
+    // Map contact fields to match existing frontend DashboardData type
+    const recentDevis = recentContacts.map((c: any) => ({
+      id: c.id,
+      reference: c.reference,
+      clientName: c.name,
+      clientEmail: c.email,
+      clientPhone: c.phone || '',
+      services: [],
+      location: '',
+      description: c.message,
+      urgency: 'NORMAL',
+      status: c.status,
+      amount: null,
+      createdAt: c.createdAt,
+      updatedAt: c.updatedAt,
+    }));
+
     return {
       stats: {
-        totalDevisThisMonth,
-        pendingDevis,
+        totalDevisThisMonth: totalContactsThisMonth,
+        pendingDevis: pendingContacts,
         activeClients,
-        monthlyRevenue,
+        monthlyRevenue: 0,
         monthlyChange,
       },
       recentDevis,
@@ -90,7 +98,7 @@ export class StatsService {
     };
   }
 
-  async getDevisStats(period: string) {
+  async getContactStats(period: string) {
     const now = new Date();
     let startDate: Date;
 
@@ -108,18 +116,18 @@ export class StatsService {
         startDate = new Date(now.getFullYear(), now.getMonth(), 1);
     }
 
-    const devis = await this.prisma.devis.findMany({
+    const contacts = await this.prisma.contact.findMany({
       where: { createdAt: { gte: startDate } },
       select: { createdAt: true, status: true },
     });
 
     const dailyStats: Record<string, { total: number; accepted: number; rejected: number }> = {};
-    for (const d of devis) {
-      const date = d.createdAt.toISOString().split('T')[0];
+    for (const c of contacts) {
+      const date = c.createdAt.toISOString().split('T')[0];
       if (!dailyStats[date]) dailyStats[date] = { total: 0, accepted: 0, rejected: 0 };
       dailyStats[date].total++;
-      if (d.status === 'ACCEPTED') dailyStats[date].accepted++;
-      if (d.status === 'REJECTED') dailyStats[date].rejected++;
+      if (c.status === 'READ') dailyStats[date].accepted++;
+      if (c.status === 'ARCHIVED') dailyStats[date].rejected++;
     }
 
     return Object.entries(dailyStats)
