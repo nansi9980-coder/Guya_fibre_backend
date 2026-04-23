@@ -10,10 +10,23 @@ import { Roles } from '../auth/roles.decorator';
 export class SettingsController {
   constructor(private settingsService: SettingsService) {}
 
+  // Routes publiques (sans auth) pour le site vitrine
   @Get('theme/public')
   @ApiOperation({ summary: 'Obtenir le thème actif (public, sans auth)' })
   async getPublicTheme() {
     return this.settingsService.findOne('theme');
+  }
+
+  @Get('company/public')
+  @ApiOperation({ summary: 'Obtenir les infos société (public, sans auth)' })
+  async getPublicCompany() {
+    return this.settingsService.findOne('company');
+  }
+
+  @Get('site/public')
+  @ApiOperation({ summary: 'Obtenir les paramètres du site (public, sans auth)' })
+  async getPublicSite() {
+    return this.settingsService.findOne('site');
   }
 
   @Get(':group')
