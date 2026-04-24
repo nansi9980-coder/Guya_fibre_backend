@@ -20,6 +20,7 @@ async function bootstrap() {
     frontendUrl,
     vitrineUrl,
     vercelUrl,
+    'https://guya-admin-7aep-nansi9980-coders-projects.vercel.app',
     'https://guya-admin.vercel.app',
     'https://guya-fibre.vercel.app',
     'https://guya-fibre-three.vercel.app',
