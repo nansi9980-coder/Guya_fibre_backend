@@ -1,186 +1,179 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { ActivityLogService } from '../logs/activity-log.service';
-import { CreateServiceContentDto, UpdateServiceContentDto, ReorderDto } from './dto';
+
+const DEFAULT_CONTENT: Record<string, any> = {
+  hero: {
+    titleFr: 'La Fibre Optique pour la Guyane',
+    titleEn: 'Fiber Optic for French Guiana',
+    subtitle: 'Connectivité haut débit pour tous',
+    badge: 'Disponible',
+    ctaPrimary: 'Demander un devis',
+    ctaSecondary: 'Nos services',
+    backgroundImage: '/images/hero-bg.jpg',
+  },
+  about: {
+    title: 'À propos de GUYA FIBRE',
+    description: 'Entreprise spécialisée dans le déploiement de fibre optique en Guyane française.',
+    stats: [
+      { value: '5000+', label: 'Foyers raccordés', icon: 'Home' },
+      { value: '15+', label: "Années d'expérience", icon: 'Award' },
+      { value: '98%', label: 'Satisfaction client', icon: 'Smile' },
+    ],
+    values: [
+      { title: 'Expertise', description: 'Équipe certifiée et expérimentée' },
+      { title: 'Rapidité', description: 'Déploiement rapide et efficace' },
+      { title: 'Qualité', description: 'Infrastructure de qualité professionnelle' },
+    ],
+    image: '/images/about.jpg',
+  },
+  faq: [
+    {
+      questionFr: "Qu'est-ce que la fibre optique ?",
+      answerFr: 'La fibre optique est une technologie de transmission de données utilisant la lumière.',
+      questionEn: 'What is fiber optic?',
+      answerEn: 'Fiber optic is a data transmission technology using light.',
+    },
+    {
+      questionFr: 'Combien de temps pour le raccordement ?',
+      answerFr: 'Le raccordement prend généralement 1 à 2 semaines.',
+      questionEn: 'How long does connection take?',
+      answerEn: 'Connection usually takes 1 to 2 weeks.',
+    },
+  ],
+  testimonials: [
+    { initials: 'JD', name: 'Jean Dupont', role: 'Particulier', company: '', rating: 5, quote: 'Service excellent, équipe très professionnelle.' },
+    { initials: 'ML', name: 'Marie Laurent', role: "Chef d'entreprise", company: 'TechCorp', rating: 5, quote: 'Raccordement rapide et sans souci.' },
+  ],
+  stats: [
+    { value: '5000+', label: 'Foyers raccordés', icon: 'Home' },
+    { value: '15+', label: "Années d'expérience", icon: 'Award' },
+    { value: '98%', label: 'Satisfaction client', icon: 'Smile' },
+    { value: '24/7', label: 'Support', icon: 'Headphones' },
+  ],
+  cta: {
+    title: 'Prêt à vous connecter ?',
+    subtitle: "Demandez votre devis gratuit dès aujourd'hui",
+    buttonText: 'Demander un devis',
+    buttonLink: '/devis',
+  },
+  footer: {
+    description: 'GUYA FIBRE - Votre partenaire pour la connectivité en Guyane',
+    socialLinks: [
+      { platform: 'facebook', url: 'https://facebook.com/guyafibre' },
+      { platform: 'linkedin', url: 'https://linkedin.com/company/guyafibre' },
+      { platform: 'instagram', url: 'https://instagram.com/guyafibre' },
+    ],
+    legalLinks: [
+      { label: 'Mentions légales', url: '/mentions-legales' },
+      { label: 'Politique de confidentialité', url: '/politique-confidentialite' },
+    ],
+  },
+};
 
 @Injectable()
-export class ServicesContentService {
+export class SiteContentService {
   constructor(
     private prisma: PrismaService,
     private activityLog: ActivityLogService,
   ) {}
 
-  async create(createDto: CreateServiceContentDto, userId: string, ipAddress?: string) {
-    // Check if slug already exists
-    const existing = await this.prisma.serviceContent.findUnique({
-      where: { slug: createDto.slug },
+  /**
+   * Retourne toujours { content: any } pour une cohérence côté client.
+   * Ainsi data.content fonctionne que la section soit en base ou en défaut.
+   */
+  async findOne(section: string): Promise<{ section: string; content: any }> {
+    const record = await this.prisma.siteContent.findUnique({
+      where: { section },
     });
-    if (existing) {
-      throw new BadRequestException(`Le slug "${createDto.slug}" existe déjà`);
+
+    if (!record) {
+      const defaultContent = DEFAULT_CONTENT[section];
+      if (defaultContent === undefined) {
+        throw new NotFoundException(`Section "${section}" non trouvée`);
+      }
+      return { section, content: defaultContent };
     }
 
-    // Get max order
-    const maxOrder = await this.prisma.serviceContent.aggregate({
-      _max: { order: true },
-    });
-
-    const service = await this.prisma.serviceContent.create({
-      data: {
-        slug: createDto.slug,
-        number: createDto.number,
-        icon: createDto.icon,
-        titleFr: createDto.titleFr,
-        titleEn: createDto.titleEn,
-        titleEs: createDto.titleEs,
-        titlePt: createDto.titlePt,
-        titleNl: createDto.titleNl,
-        titleGcr: createDto.titleGcr,
-        descFr: createDto.descFr,
-        descEn: createDto.descEn,
-        features: createDto.features,
-        image: createDto.image,
-        benefit: createDto.benefit,
-        order: (maxOrder._max.order || 0) + 1,
-      },
-    });
-
-    await this.activityLog.log({
-      action: 'CREATE',
-      entity: 'Service',
-      entityId: service.id,
-      description: `Service "${service.titleFr}" créé`,
-      userId,
-      ipAddress,
-    });
-
-    return service;
+    return { section: record.section, content: record.content };
   }
 
-  async findAll(isActive?: boolean) {
-    const where: any = {};
-    if (isActive !== undefined) where.isActive = isActive;
+  async findAll() {
+    const contents = await this.prisma.siteContent.findMany();
+    const result: Record<string, any> = {};
 
-    return this.prisma.serviceContent.findMany({
-      where,
-      orderBy: { order: 'asc' },
-    });
-  }
-
-  async findOne(id: string) {
-    const service = await this.prisma.serviceContent.findUnique({
-      where: { id },
-    });
-    if (!service) {
-      throw new NotFoundException(`Service ${id} non trouvé`);
-    }
-    return service;
-  }
-
-  async findBySlug(slug: string) {
-    const service = await this.prisma.serviceContent.findUnique({
-      where: { slug },
-    });
-    if (!service) {
-      throw new NotFoundException(`Service ${slug} non trouvé`);
-    }
-    return service;
-  }
-
-  async update(id: string, updateDto: UpdateServiceContentDto, userId: string, ipAddress?: string) {
-    const service = await this.prisma.serviceContent.findUnique({ where: { id } });
-    if (!service) {
-      throw new NotFoundException(`Service ${id} non trouvé`);
+    for (const content of contents) {
+      result[content.section] = content.content;
     }
 
-    // Check slug uniqueness if changed
-    if (updateDto.slug && updateDto.slug !== service.slug) {
-      const existing = await this.prisma.serviceContent.findUnique({
-        where: { slug: updateDto.slug },
-      });
-      if (existing) {
-        throw new BadRequestException(`Le slug "${updateDto.slug}" existe déjà`);
+    // Add default sections that don't exist yet
+    for (const [section, defaultContent] of Object.entries(DEFAULT_CONTENT)) {
+      if (!result[section]) {
+        result[section] = defaultContent;
       }
     }
 
-    const updated = await this.prisma.serviceContent.update({
-      where: { id },
-      data: updateDto,
-    });
-
-    await this.activityLog.log({
-      action: 'UPDATE',
-      entity: 'Service',
-      entityId: id,
-      description: `Service "${updated.titleFr}" mis à jour`,
-      userId,
-      ipAddress,
-    });
-
-    return updated;
+    return result;
   }
 
-  async remove(id: string, userId: string, ipAddress?: string) {
-    const service = await this.prisma.serviceContent.findUnique({ where: { id } });
-    if (!service) {
-      throw new NotFoundException(`Service ${id} non trouvé`);
-    }
-
-    await this.prisma.serviceContent.delete({ where: { id } });
-
-    await this.activityLog.log({
-      action: 'DELETE',
-      entity: 'Service',
-      entityId: id,
-      description: `Service "${service.titleFr}" supprimé`,
-      userId,
-      ipAddress,
+  async update(section: string, content: any, userId: string, ipAddress?: string) {
+    const existing = await this.prisma.siteContent.findUnique({
+      where: { section },
     });
 
-    return { message: 'Service supprimé avec succès' };
-  }
-
-  async toggle(id: string, userId: string, ipAddress?: string) {
-    const service = await this.prisma.serviceContent.findUnique({ where: { id } });
-    if (!service) {
-      throw new NotFoundException(`Service ${id} non trouvé`);
-    }
-
-    const updated = await this.prisma.serviceContent.update({
-      where: { id },
-      data: { isActive: !service.isActive },
-    });
-
-    await this.activityLog.log({
-      action: 'TOGGLE',
-      entity: 'Service',
-      entityId: id,
-      description: `Service "${updated.titleFr}" ${updated.isActive ? 'activé' : 'désactivé'}`,
-      userId,
-      ipAddress,
-    });
-
-    return updated;
-  }
-
-  async reorder(reorderDto: ReorderDto, userId: string, ipAddress?: string) {
-    const { items } = reorderDto;
-
-    // Update all orders
-    for (let i = 0; i < items.length; i++) {
-      await this.prisma.serviceContent.update({
-        where: { id: items[i].id },
-        data: { order: i },
+    let updated;
+    if (existing) {
+      updated = await this.prisma.siteContent.update({
+        where: { section },
+        data: { content, updatedById: userId },
+      });
+    } else {
+      updated = await this.prisma.siteContent.create({
+        data: { section, content, updatedById: userId },
       });
     }
 
     await this.activityLog.log({
-      action: 'REORDER',
-      entity: 'Service',
-      description: 'Services réordonnés',
+      action: 'UPDATE',
+      entity: 'SiteContent',
+      entityId: section,
+      description: `Section "${section}" mise à jour`,
       userId,
       ipAddress,
     });
 
-    return { message: 'Ordre mis à jour' };
+    return { section: updated.section, content: updated.content };
+  }
+
+  async reset(section: string, userId: string, ipAddress?: string) {
+    const defaultContent = DEFAULT_CONTENT[section];
+    if (!defaultContent) {
+      throw new NotFoundException(`Section "${section}" non trouvée`);
+    }
+
+    const existing = await this.prisma.siteContent.findUnique({ where: { section } });
+
+    let updated;
+    if (existing) {
+      updated = await this.prisma.siteContent.update({
+        where: { section },
+        data: { content: defaultContent, updatedById: userId },
+      });
+    } else {
+      updated = await this.prisma.siteContent.create({
+        data: { section, content: defaultContent, updatedById: userId },
+      });
+    }
+
+    await this.activityLog.log({
+      action: 'RESET',
+      entity: 'SiteContent',
+      entityId: section,
+      description: `Section "${section}" réinitialisée`,
+      userId,
+      ipAddress,
+    });
+
+    return { section: updated.section, content: updated.content };
   }
 }
