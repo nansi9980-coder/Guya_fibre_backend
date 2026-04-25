@@ -12,20 +12,36 @@ export class EmailService {
 
   constructor(private prisma: PrismaService) {
     const apiKey = process.env.RESEND_API_KEY;
-    this.fromEmail = process.env.EMAIL_FROM || 'noreply@guyafibre.com';
     this.fromName = process.env.EMAIL_FROM_NAME || 'GUYA FIBRE';
+
+    // Si le domaine n'est pas encore vérifié sur Resend, utiliser l'adresse de test Resend.
+    // Une fois guyafibre.com vérifié sur https://resend.com/domains, remplacer par l'email réel.
+    const configuredFrom = process.env.EMAIL_FROM || 'noreply@guyafibre.com';
+    const domainVerified = process.env.EMAIL_DOMAIN_VERIFIED === 'true';
+    this.fromEmail = domainVerified ? configuredFrom : 'onboarding@resend.dev';
 
     if (apiKey) {
       this.resend = new Resend(apiKey);
       this.isConfigured = true;
       this.logger.log('Email service initialized with Resend');
+      if (!domainVerified) {
+        this.logger.warn(
+          `Domain not verified — using fallback sender "onboarding@resend.dev". ` +
+          `Verify ${configuredFrom.split('@')[1]} at https://resend.com/domains then set EMAIL_DOMAIN_VERIFIED=true`,
+        );
+      }
     } else {
       this.isConfigured = false;
       this.logger.warn('RESEND_API_KEY not configured - emails will be logged only');
     }
   }
 
-  async sendEmail(to: string, subject: string, html: string, text?: string): Promise<{ success: boolean; messageId?: string; error?: string }> {
+  async sendEmail(
+    to: string,
+    subject: string,
+    html: string,
+    text?: string,
+  ): Promise<{ success: boolean; messageId?: string; error?: string }> {
     if (!this.isConfigured) {
       this.logger.log(`[EMAIL MOCK] To: ${to}, Subject: ${subject}`);
       this.logger.debug(`[EMAIL MOCK] HTML: ${html.substring(0, 200)}...`);
@@ -83,13 +99,16 @@ export class EmailService {
     await this.sendEmail(devis.clientEmail, subject, html, text);
   }
 
-  async sendDevisNotificationToAdmin(devis: {
-    reference: string;
-    clientName: string;
-    clientEmail: string;
-    clientPhone?: string;
-    service?: string;
-  }, adminEmail: string): Promise<void> {
+  async sendDevisNotificationToAdmin(
+    devis: {
+      reference: string;
+      clientName: string;
+      clientEmail: string;
+      clientPhone?: string;
+      service?: string;
+    },
+    adminEmail: string,
+  ): Promise<void> {
     const template = await this.prisma.emailTemplate.findUnique({
       where: { slug: 'devis-notification-admin' },
     });
@@ -141,14 +160,17 @@ export class EmailService {
     await this.sendEmail(contact.email, subject, html, text);
   }
 
-  async sendContactNotificationToAdmin(contact: {
-    reference: string;
-    name: string;
-    email: string;
-    phone?: string;
-    subject: string;
-    message: string;
-  }, adminEmail: string): Promise<void> {
+  async sendContactNotificationToAdmin(
+    contact: {
+      reference: string;
+      name: string;
+      email: string;
+      phone?: string;
+      subject: string;
+      message: string;
+    },
+    adminEmail: string,
+  ): Promise<void> {
     const template = await this.prisma.emailTemplate.findUnique({
       where: { slug: 'contact-notification-admin' },
     });
@@ -202,12 +224,14 @@ export class EmailService {
     await this.sendEmail(devis.clientEmail, subject, html, text);
   }
 
-  async sendTestEmail(to: string): Promise<{ success: boolean; messageId?: string; error?: string }> {
+  async sendTestEmail(
+    to: string,
+  ): Promise<{ success: boolean; messageId?: string; error?: string }> {
     return this.sendEmail(
       to,
       'Test Email - GUYA FIBRE',
       '<h1>Test Email</h1><p>This is a test email from GUYA FIBRE.</p>',
-      'Test Email\n\nThis is a test email from GUYA FIBRE.'
+      'Test Email\n\nThis is a test email from GUYA FIBRE.',
     );
   }
 
