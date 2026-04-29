@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { ActivityLogService } from '../logs/activity-log.service';
+import { EmailService } from '../email/email.service';
 
 const DEFAULT_TEMPLATES = [
   {
@@ -91,6 +92,7 @@ export class EmailTemplatesService {
   constructor(
     private prisma: PrismaService,
     private activityLog: ActivityLogService,
+    private emailService: EmailService,
   ) {}
 
   async findAll() {
@@ -174,7 +176,27 @@ export class EmailTemplatesService {
     subject: string;
     message: string;
   }) {
-    console.log(`[Contact] Notification sent for ${contact.reference}`);
+    const adminEmail = process.env.ADMIN_EMAIL || 'contact@guyafibre.com';
+
+    await Promise.all([
+      this.emailService.sendContactNotificationToAdmin(
+        {
+          reference: contact.reference,
+          name: contact.name,
+          email: contact.email,
+          phone: contact.phone ?? undefined,
+          subject: contact.subject,
+          message: contact.message,
+        },
+        adminEmail,
+      ),
+      this.emailService.sendContactConfirmation({
+        name: contact.name,
+        email: contact.email,
+        reference: contact.reference,
+      }),
+    ]);
+
     return { message: 'Contact notification processed' };
   }
 
@@ -183,7 +205,7 @@ export class EmailTemplatesService {
     name: string;
     email: string;
   }) {
-    console.log(`[Contact] Confirmation sent to ${contact.email} for ${contact.reference}`);
+    await this.emailService.sendContactConfirmation(contact);
     return { message: 'Contact confirmation processed' };
   }
 }
