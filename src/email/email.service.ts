@@ -6,33 +6,22 @@ import { PrismaService } from '../prisma/prisma.service';
 export class EmailService {
   private readonly logger = new Logger(EmailService.name);
   private resend: Resend | null = null;
-  private fromEmail: string;
-  private fromName: string;
+  private from: string;
   private isConfigured: boolean;
 
   constructor(private prisma: PrismaService) {
     const apiKey = process.env.RESEND_API_KEY;
-    this.fromName = process.env.EMAIL_FROM_NAME || 'GUYA FIBRE';
 
-    // Si le domaine n'est pas encore vérifié sur Resend, utiliser l'adresse de test Resend.
-    // Une fois guyafibre.com vérifié sur https://resend.com/domains, remplacer par l'email réel.
-    const configuredFrom = process.env.EMAIL_FROM || 'noreply@guyafibre.com';
-    const domainVerified = process.env.EMAIL_DOMAIN_VERIFIED === 'true';
-    this.fromEmail = domainVerified ? configuredFrom : 'onboarding@resend.dev';
+    // EMAIL_FROM sur Railway : "GUYA FIBRE <contact@guyafibre.fr>"
+    this.from = process.env.EMAIL_FROM || 'GUYA FIBRE <contact@guyafibre.fr>';
 
     if (apiKey) {
       this.resend = new Resend(apiKey);
       this.isConfigured = true;
-      this.logger.log('Email service initialized with Resend');
-      if (!domainVerified) {
-        this.logger.warn(
-          `Domain not verified — using fallback sender "onboarding@resend.dev". ` +
-          `Verify ${configuredFrom.split('@')[1]} at https://resend.com/domains then set EMAIL_DOMAIN_VERIFIED=true`,
-        );
-      }
+      this.logger.log(`Email service initialisé — from: ${this.from}`);
     } else {
       this.isConfigured = false;
-      this.logger.warn('RESEND_API_KEY not configured - emails will be logged only');
+      this.logger.warn('RESEND_API_KEY non configuré — les emails seront loggés uniquement');
     }
   }
 
@@ -44,28 +33,27 @@ export class EmailService {
   ): Promise<{ success: boolean; messageId?: string; error?: string }> {
     if (!this.isConfigured) {
       this.logger.log(`[EMAIL MOCK] To: ${to}, Subject: ${subject}`);
-      this.logger.debug(`[EMAIL MOCK] HTML: ${html.substring(0, 200)}...`);
       return { success: true, messageId: 'mock-id' };
     }
 
     try {
       const { data, error } = await this.resend!.emails.send({
-        from: `${this.fromName} <${this.fromEmail}>`,
+        from: this.from,
         to: [to],
         subject,
         html,
-        text,
+        ...(text ? { text } : {}),
       });
 
       if (error) {
-        this.logger.error(`Failed to send email: ${error.message}`);
+        this.logger.error(`Échec d'envoi email: ${error.message}`);
         return { success: false, error: error.message };
       }
 
-      this.logger.log(`Email sent successfully: ${data?.id}`);
+      this.logger.log(`Email envoyé avec succès: ${data?.id}`);
       return { success: true, messageId: data?.id };
     } catch (error: any) {
-      this.logger.error(`Email sending error: ${error.message}`);
+      this.logger.error(`Erreur envoi email: ${error.message}`);
       return { success: false, error: error.message };
     }
   }
@@ -81,7 +69,7 @@ export class EmailService {
     });
 
     if (!template) {
-      this.logger.warn('Template devis-confirmation-client not found');
+      this.logger.warn('Template devis-confirmation-client non trouvé');
       return;
     }
 
@@ -114,7 +102,7 @@ export class EmailService {
     });
 
     if (!template) {
-      this.logger.warn('Template devis-notification-admin not found');
+      this.logger.warn('Template devis-notification-admin non trouvé');
       return;
     }
 
@@ -144,7 +132,7 @@ export class EmailService {
     });
 
     if (!template) {
-      this.logger.warn('Template contact-confirmation-client not found');
+      this.logger.warn('Template contact-confirmation-client non trouvé');
       return;
     }
 
@@ -176,7 +164,7 @@ export class EmailService {
     });
 
     if (!template) {
-      this.logger.warn('Template contact-notification-admin not found');
+      this.logger.warn('Template contact-notification-admin non trouvé');
       return;
     }
 
@@ -207,7 +195,7 @@ export class EmailService {
     });
 
     if (!template) {
-      this.logger.warn('Template devis-response not found');
+      this.logger.warn('Template devis-response non trouvé');
       return;
     }
 
@@ -230,8 +218,8 @@ export class EmailService {
     return this.sendEmail(
       to,
       'Test Email - GUYA FIBRE',
-      '<h1>Test Email</h1><p>This is a test email from GUYA FIBRE.</p>',
-      'Test Email\n\nThis is a test email from GUYA FIBRE.',
+      '<h1>Test Email</h1><p>Ceci est un email de test envoyé par GUYA FIBRE.</p>',
+      'Test Email\n\nCeci est un email de test envoyé par GUYA FIBRE.',
     );
   }
 
