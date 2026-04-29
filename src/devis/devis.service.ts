@@ -15,7 +15,7 @@ export class DevisService {
   async create(createDevisDto: CreateDevisDto, ipAddress?: string) {
     const year = new Date().getFullYear();
     const lastDevis = await this.prisma.devis.findFirst({
-      where: { reference: { startsWith: `DEV-${year}` } },
+      where: { reference: { startsWith: `PRC-${year}` } },
       orderBy: { reference: 'desc' },
     });
 
@@ -25,7 +25,7 @@ export class DevisService {
       nextNumber = lastNumber + 1;
     }
 
-    const reference = `DEV-${year}-${nextNumber.toString().padStart(3, '0')}`;
+    const reference = `PRC-${year}-${nextNumber.toString().padStart(3, '0')}`;
 
     const devis = await this.prisma.devis.create({
       data: {
