@@ -15,6 +15,8 @@ import { UsersModule } from './users/users.module';
 import { ContactModule } from './contact/contact.module';
 import { EmailModule } from './email/email.module';
 import { RapportsModule } from './rapports/rapports.module';
+import { AppService } from './app.service';
+import { PrismaService } from './prisma/prisma.service';
 
 @Module({
   imports: [
@@ -46,5 +48,6 @@ import { RapportsModule } from './rapports/rapports.module';
     EmailModule,
     RapportsModule,
   ],
+  providers: [AppService, PrismaService],
 })
 export class AppModule {}
