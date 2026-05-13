@@ -9,9 +9,10 @@ async function bootstrap() {
 
   app.setGlobalPrefix('api');
 
-  // ✅ Helmet configuration pour les fichiers statiques
+  // ✅ Helmet configuration complète
   app.use(helmet({
     crossOriginResourcePolicy: false,
+    contentSecurityPolicy: false,
   }));
   app.use(cookieParser());
 
