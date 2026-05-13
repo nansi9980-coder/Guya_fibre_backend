@@ -86,8 +86,9 @@ export class MediasService {
     fs.writeFileSync(filepath, file.buffer);
 
     // Thumbnail uniquement pour les images
+    // ✅ CHANGÉ: URL pointant vers /files au lieu de /api/medias/file
     const isImage = file.mimetype.startsWith('image/');
-    const thumbnailUrl = isImage ? `/api/medias/file/${filename}` : null;
+    const thumbnailUrl = isImage ? `/files/${filename}` : null;
 
     const media = await this.prisma.media.create({
       data: {
@@ -95,7 +96,7 @@ export class MediasService {
         originalName: file.originalname,
         mimeType: file.mimetype,
         size: file.size,
-        url: `/api/medias/file/${filename}`,
+        url: `/files/${filename}`, // ✅ CHANGÉ: /files au lieu de /api/medias/file
         thumbnailUrl,
         folder,
         uploadedById: userId,

@@ -1,6 +1,8 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { ThrottlerModule } from '@nestjs/throttler';
+import { ServeStaticModule } from '@nestjs/serve-static';
+import { join } from 'path';
 import { AuthModule } from './auth/auth.module';
 import { DevisModule } from './devis/devis.module';
 import { ServicesContentModule } from './services-content/services-content.module';
@@ -21,6 +23,13 @@ import { PrismaService } from './prisma/prisma.service';
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
+    
+    // ✅ NOUVEAU: Servir les fichiers statiques du dossier uploads
+    ServeStaticModule.forRoot({
+      rootPath: join(__dirname, '..', 'uploads'),
+      serveRoot: '/files', // Les fichiers seront accessibles via /files/xxx.jpg
+    }),
+    
     ThrottlerModule.forRoot([
       {
         name: 'short',

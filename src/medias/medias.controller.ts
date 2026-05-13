@@ -20,7 +20,7 @@ export class MediasController {
   @ApiConsumes('multipart/form-data')
   @ApiOperation({ summary: 'Upload un fichier (EDITOR+)' })
   async upload(
-    @UploadedFile() file: Express.Multer.File,
+    @UploadedFile() file: any,
     @Body('folder') folder?: string,
     @Request() req?: any,
   ) {
@@ -36,7 +36,7 @@ export class MediasController {
   @ApiConsumes('multipart/form-data')
   @ApiOperation({ summary: 'Upload multiple fichiers (EDITOR+)' })
   async uploadMultiple(
-    @UploadedFile() files: Express.Multer.File[],
+    @UploadedFile() files: any,
     @Body('folder') folder?: string,
     @Request() req?: any,
   ) {
@@ -60,9 +60,23 @@ export class MediasController {
   @Get('file/:filename')
   @ApiOperation({ summary: 'Servir un fichier (public)' })
   async getFile(@Param('filename') filename: string, @Res() res: Response) {
-    const { stream, mimeType } = await this.mediasService.getFile(filename);
-    res.setHeader('Content-Type', mimeType);
-    stream.pipe(res);
+    try {
+      const { stream, mimeType } = await this.mediasService.getFile(filename);
+      
+      // ✅ Headers pour servir correctement le fichier
+      res.setHeader('Content-Type', mimeType);
+      res.setHeader('Access-Control-Allow-Origin', '*');
+      res.setHeader('Cache-Control', 'public, max-age=86400');
+      res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
+      res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+      
+      stream.pipe(res);
+    } catch (error: any) {
+      res.status(404).json({ 
+        error: 'Fichier non trouvé',
+        message: error?.message || 'Erreur inconnue'
+      });
+    }
   }
 
   @Get(':id')
