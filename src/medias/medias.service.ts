@@ -85,8 +85,7 @@ export class MediasService {
 
     fs.writeFileSync(filepath, file.buffer);
 
-    // Thumbnail uniquement pour les images
-    // ✅ CHANGÉ: URL pointant vers /files au lieu de /api/medias/file
+    // ✅ Utiliser /files au lieu de /api/medias/file
     const isImage = file.mimetype.startsWith('image/');
     const thumbnailUrl = isImage ? `/files/${filename}` : null;
 
@@ -96,7 +95,7 @@ export class MediasService {
         originalName: file.originalname,
         mimeType: file.mimetype,
         size: file.size,
-        url: `/files/${filename}`, // ✅ CHANGÉ: /files au lieu de /api/medias/file
+        url: `/files/${filename}`, // ✅ Nouveau chemin
         thumbnailUrl,
         folder,
         uploadedById: userId,

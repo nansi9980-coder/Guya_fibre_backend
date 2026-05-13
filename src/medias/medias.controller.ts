@@ -28,22 +28,6 @@ export class MediasController {
     return this.mediasService.upload(file, folder || 'general', req.user.id, ipAddress);
   }
 
-  @Post('upload-multiple')
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('SUPER_ADMIN', 'EDITOR')
-  @ApiBearerAuth()
-  @UseInterceptors(FileInterceptor('files'))
-  @ApiConsumes('multipart/form-data')
-  @ApiOperation({ summary: 'Upload multiple fichiers (EDITOR+)' })
-  async uploadMultiple(
-    @UploadedFile() files: any,
-    @Body('folder') folder?: string,
-    @Request() req?: any,
-  ) {
-    const ipAddress = req?.ip || req?.connection?.remoteAddress;
-    return this.mediasService.uploadMultiple(files, folder || 'general', req.user.id, ipAddress);
-  }
-
   @Get()
   @UseGuards(JwtAuthGuard, RolesGuard)
   @ApiBearerAuth()
@@ -55,28 +39,6 @@ export class MediasController {
     @Query('search') search?: string,
   ) {
     return this.mediasService.findAll({ page, limit, folder, search });
-  }
-
-  @Get('file/:filename')
-  @ApiOperation({ summary: 'Servir un fichier (public)' })
-  async getFile(@Param('filename') filename: string, @Res() res: Response) {
-    try {
-      const { stream, mimeType } = await this.mediasService.getFile(filename);
-      
-      // ✅ Headers pour servir correctement le fichier
-      res.setHeader('Content-Type', mimeType);
-      res.setHeader('Access-Control-Allow-Origin', '*');
-      res.setHeader('Cache-Control', 'public, max-age=86400');
-      res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
-      res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
-      
-      stream.pipe(res);
-    } catch (error: any) {
-      res.status(404).json({ 
-        error: 'Fichier non trouvé',
-        message: error?.message || 'Erreur inconnue'
-      });
-    }
   }
 
   @Get(':id')
