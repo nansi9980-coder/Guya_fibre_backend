@@ -9,13 +9,7 @@ async function bootstrap() {
 
   app.setGlobalPrefix('api');
 
-  // ✅ Helmet configuration complète
-  app.use(helmet({
-    crossOriginResourcePolicy: false,
-    contentSecurityPolicy: false,
-  }));
-  app.use(cookieParser());
-
+  // ✅ CORS DOIT ÊTRE EN PREMIER
   const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3001';
   const vitrineUrl = process.env.VITRINE_URL || 'http://localhost:3000';
   const vercelUrl = process.env.VERCEL_URL || '';
@@ -35,6 +29,7 @@ async function bootstrap() {
     'http://localhost:3001',
   ].filter(Boolean);
 
+  // ✅ CORS EN PREMIER
   app.enableCors({
     origin: allowedOrigins,
     credentials: true,
@@ -42,6 +37,14 @@ async function bootstrap() {
     allowedHeaders: ['Content-Type', 'Authorization'],
     exposedHeaders: ['Content-Type', 'Content-Length'],
   });
+
+  // ✅ HELMET APRÈS
+  app.use(helmet({
+    crossOriginResourcePolicy: false,
+    contentSecurityPolicy: false,
+  }));
+  
+  app.use(cookieParser());
 
   app.useGlobalPipes(
     new ValidationPipe({
