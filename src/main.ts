@@ -9,40 +9,19 @@ async function bootstrap() {
 
   app.setGlobalPrefix('api');
 
-  // ✅ CORS DOIT ÊTRE EN PREMIER
-  const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3001';
-  const vitrineUrl = process.env.VITRINE_URL || 'http://localhost:3000';
-  const vercelUrl = process.env.VERCEL_URL || '';
-
-  const allowedOrigins = [
-    frontendUrl,
-    vitrineUrl,
-    vercelUrl,
-    'https://guya-admin-7aep-nansi9980-coders-projects.vercel.app',
-    'https://guya-admin.vercel.app',
-    'https://guya-fibre.vercel.app',
-    'https://guya-fibre-three.vercel.app',
-    'https://guyafibre-frontend.vercel.app',
-    'https://guyafibre.com',
-    'https://www.guyafibre.com',
-    'http://localhost:3000',
-    'http://localhost:3001',
-  ].filter(Boolean);
-
-  // ✅ CORS EN PREMIER
-  app.enableCors({
-    origin: allowedOrigins,
-    credentials: true,
-    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization'],
-    exposedHeaders: ['Content-Type', 'Content-Length'],
-  });
-
-  // ✅ HELMET APRÈS
+  // ✅ DÉSACTIVER HELMET COMPLÈTEMENT
   app.use(helmet({
-    crossOriginResourcePolicy: false,
+    crossOriginResourcePolicy: { policy: 'cross-origin' },
     contentSecurityPolicy: false,
   }));
+
+  // ✅ CORS TRÈS PERMISSIF (temporairement)
+  app.enableCors({
+    origin: '*',  // ← ACCEPTER TOUTES LES ORIGINES
+    credentials: false,
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    allowedHeaders: '*',
+  });
   
   app.use(cookieParser());
 
