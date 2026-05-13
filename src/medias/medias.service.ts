@@ -2,9 +2,7 @@ import { Injectable, NotFoundException, BadRequestException } from '@nestjs/comm
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../prisma/prisma.service';
 import { ActivityLogService } from '../logs/activity-log.service';
-import * as fs from 'fs';
-import * as path from 'path';
-import { v4 as uuidv4 } from 'uuid';
+import { CloudinaryService } from '../cloudinary/cloudinary.service';
 
 const ALLOWED_MIME_TYPES = [
   // Images
@@ -51,18 +49,12 @@ const MAX_FILE_SIZE = 100 * 1024 * 1024; // 100MB
 
 @Injectable()
 export class MediasService {
-  private uploadDir: string;
-
   constructor(
     private config: ConfigService,
     private prisma: PrismaService,
     private activityLog: ActivityLogService,
-  ) {
-    this.uploadDir = this.config.get('UPLOAD_DIR') || './uploads';
-    if (!fs.existsSync(this.uploadDir)) {
-      fs.mkdirSync(this.uploadDir, { recursive: true });
-    }
-  }
+    private cloudinary: CloudinaryService,
+  ) {}
 
   async upload(file: any, folder: string = 'general', userId: string, ipAddress?: string) {
     if (!file) {
@@ -71,7 +63,7 @@ export class MediasService {
 
     if (!ALLOWED_MIME_TYPES.includes(file.mimetype)) {
       throw new BadRequestException(
-        `Type de fichier non autorisé: ${file.mimetype}. Types acceptés: images, vidéos, PDF, documents, archives.`
+        `Type de fichier non autorisé: ${file.mimetype}. Types acceptés: images, vidéos, PDF, documents, archives.`,
       );
     }
 
@@ -79,24 +71,22 @@ export class MediasService {
       throw new BadRequestException('Fichier trop volumineux. Taille max: 100MB');
     }
 
-    const ext = path.extname(file.originalname);
-    const filename = `${uuidv4()}${ext}`;
-    const filepath = path.join(this.uploadDir, filename);
+    // ✅ Upload sur Cloudinary (stockage persistant + CDN)
+    const uploaded = await this.cloudinary.uploadFile(
+      { buffer: file.buffer, mimetype: file.mimetype, originalname: file.originalname },
+      folder,
+    );
 
-    fs.writeFileSync(filepath, file.buffer);
-
-    // ✅ Utiliser /files au lieu de /api/medias/file
     const isImage = file.mimetype.startsWith('image/');
-    const thumbnailUrl = isImage ? `/files/${filename}` : null;
 
     const media = await this.prisma.media.create({
       data: {
-        filename,
+        filename: uploaded.publicId, // on stocke le publicId Cloudinary
         originalName: file.originalname,
         mimeType: file.mimetype,
         size: file.size,
-        url: `/files/${filename}`, // ✅ Nouveau chemin
-        thumbnailUrl,
+        url: uploaded.url, // URL absolue Cloudinary (https://res.cloudinary.com/...)
+        thumbnailUrl: isImage ? uploaded.url : null,
         folder,
         uploadedById: userId,
       },
@@ -106,7 +96,7 @@ export class MediasService {
       action: 'UPLOAD',
       entity: 'Media',
       entityId: media.id,
-      description: `Fichier "${file.originalname}" uploadé (${file.mimetype})`,
+      description: `Fichier "${file.originalname}" uploadé sur Cloudinary (${file.mimetype})`,
       userId,
       ipAddress,
     });
@@ -179,54 +169,6 @@ export class MediasService {
     return media;
   }
 
-  async getFile(filename: string): Promise<{ stream: fs.ReadStream; mimeType: string }> {
-    const filepath = path.join(this.uploadDir, filename);
-    if (!fs.existsSync(filepath)) {
-      throw new NotFoundException('Fichier non trouvé');
-    }
-
-    const ext = path.extname(filename).toLowerCase();
-    const mimeTypes: Record<string, string> = {
-      // Images
-      '.jpg': 'image/jpeg',
-      '.jpeg': 'image/jpeg',
-      '.png': 'image/png',
-      '.webp': 'image/webp',
-      '.svg': 'image/svg+xml',
-      '.gif': 'image/gif',
-      '.bmp': 'image/bmp',
-      // Vidéos
-      '.mp4': 'video/mp4',
-      '.mov': 'video/quicktime',
-      '.avi': 'video/x-msvideo',
-      '.webm': 'video/webm',
-      '.mkv': 'video/x-matroska',
-      '.3gp': 'video/3gpp',
-      // Documents
-      '.pdf': 'application/pdf',
-      '.doc': 'application/msword',
-      '.docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-      '.xls': 'application/vnd.ms-excel',
-      '.xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-      '.ppt': 'application/vnd.ms-powerpoint',
-      '.pptx': 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
-      // Archives
-      '.zip': 'application/zip',
-      '.rar': 'application/x-rar-compressed',
-      // Audio
-      '.mp3': 'audio/mpeg',
-      '.wav': 'audio/wav',
-      // Texte
-      '.txt': 'text/plain',
-      '.csv': 'text/csv',
-    };
-
-    return {
-      stream: fs.createReadStream(filepath),
-      mimeType: mimeTypes[ext] || 'application/octet-stream',
-    };
-  }
-
   async remove(id: string, userId: string, userRole: string, ipAddress?: string) {
     if (userRole !== 'SUPER_ADMIN') {
       throw new BadRequestException('Seuls les SUPER_ADMIN peuvent supprimer des médias');
@@ -237,10 +179,13 @@ export class MediasService {
       throw new NotFoundException(`Média ${id} non trouvé`);
     }
 
-    const filepath = path.join(this.uploadDir, media.filename);
-    if (fs.existsSync(filepath)) {
-      fs.unlinkSync(filepath);
-    }
+    // ✅ Supprimer sur Cloudinary aussi
+    let resourceType: 'image' | 'video' | 'raw' = 'raw';
+    if (media.mimeType.startsWith('image/')) resourceType = 'image';
+    else if (media.mimeType.startsWith('video/')) resourceType = 'video';
+
+    // filename contient le publicId Cloudinary
+    await this.cloudinary.deleteFile(media.filename, resourceType);
 
     await this.prisma.media.delete({ where: { id } });
 

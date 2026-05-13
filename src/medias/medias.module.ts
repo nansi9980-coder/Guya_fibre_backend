@@ -4,11 +4,13 @@ import { MediasService } from './medias.service';
 import { MediasController } from './medias.controller';
 import { PrismaModule } from '../prisma/prisma.module';
 import { LogsModule } from '../logs/logs.module';
+import { CloudinaryModule } from '../cloudinary/cloudinary.module';
 
 @Module({
   imports: [
     PrismaModule,
     LogsModule,
+    CloudinaryModule,
     MulterModule.register({
       limits: { fileSize: 100 * 1024 * 1024 }, // 100MB — images, vidéos, documents
     }),
