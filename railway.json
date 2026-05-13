@@ -1,0 +1,12 @@
+{
+  "build": {
+    "builder": "nixpacks"
+  },
+  "deploy": {
+    "numReplicas": 1,
+    "startCommand": "npm run start:prod"
+  },
+  "volumes": {
+    "uploads": "/app/uploads"
+  }
+}
