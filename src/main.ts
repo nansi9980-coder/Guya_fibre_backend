@@ -9,7 +9,9 @@ async function bootstrap() {
 
   app.setGlobalPrefix('api');
 
-  app.use(helmet());
+  app.use(helmet({
+    crossOriginResourcePolicy: { policy: 'cross-origin' }, // ✅ AJOUTER: Permet l'accès cross-origin aux ressources
+  }));
   app.use(cookieParser());
 
   const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3001';
@@ -36,7 +38,7 @@ async function bootstrap() {
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization'],
-    exposedHeaders: ['Content-Type'], // ✅ AJOUTER: Permet aux clients d'accéder à ce header
+    exposedHeaders: ['Content-Type', 'Content-Length'], // ✅ Amélioré
   });
 
   app.useGlobalPipes(
