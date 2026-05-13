@@ -9,8 +9,9 @@ async function bootstrap() {
 
   app.setGlobalPrefix('api');
 
+  // ✅ Helmet configuration pour les fichiers statiques
   app.use(helmet({
-    crossOriginResourcePolicy: { policy: 'cross-origin' }, // ✅ AJOUTER: Permet l'accès cross-origin aux ressources
+    crossOriginResourcePolicy: false,
   }));
   app.use(cookieParser());
 
@@ -38,7 +39,7 @@ async function bootstrap() {
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization'],
-    exposedHeaders: ['Content-Type', 'Content-Length'], // ✅ Amélioré
+    exposedHeaders: ['Content-Type', 'Content-Length'],
   });
 
   app.useGlobalPipes(
