@@ -9,19 +9,26 @@ async function bootstrap() {
 
   app.setGlobalPrefix('api');
 
-  // ✅ DÉSACTIVER HELMET COMPLÈTEMENT
+  // ✅ CORS AVEC CREDENTIALS (AVANT Helmet)
+  app.enableCors({
+    origin: [
+      'https://guya-admin.vercel.app',
+      'https://guya-fibre.vercel.app',
+      'https://guyafibre.com',
+      'https://www.guyafibre.com',
+      'http://localhost:3000',
+      'http://localhost:3001',
+    ],
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
+  });
+
+  // ✅ HELMET APRÈS CORS
   app.use(helmet({
     crossOriginResourcePolicy: { policy: 'cross-origin' },
     contentSecurityPolicy: false,
   }));
-
-  // ✅ CORS TRÈS PERMISSIF (temporairement)
-  app.enableCors({
-    origin: '*',  // ← ACCEPTER TOUTES LES ORIGINES
-    credentials: false,
-    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-    allowedHeaders: '*',
-  });
   
   app.use(cookieParser());
 
